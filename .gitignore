@@ -1,0 +1,47 @@
+## Игнорирование файлов сборки и публикации
+bin/
+obj/
+publish/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+
+## Файлы конфигурации с секретами
+appsettings.Development.json
+appsettings.Production.json
+secrets.json
+
+## Файлы VS Code
+.vscode/
+*.code-workspace
+
+## Файлы Visual Studio
+.vs/
+*.csproj.user
+*.csproj.user
+_ReSharper.*/
+*.DotSettings.user
+
+## Логи и результаты тестов
+TestResults/
+*.trx
+*.log
+coverage/
+*.coverage
+*.coverage.xml
+
+## Директории пакетов
+packages/
+*.nupkg
+
+## Файлы развертывания
+PublishScripts/
+PublishProfiles/
+
+## Настройки IDE
+/.idea/
+*.swp
+*.swo
+*~
+.DS_Store
