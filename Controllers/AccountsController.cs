@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MoneyTrackerApi.Models;
+using System.Threading.Tasks;
 
 namespace MoneyTrackerApi.Controllers
 {
@@ -7,10 +10,18 @@ namespace MoneyTrackerApi.Controllers
     [ApiController]
     public class AccountsController : ControllerBase
     {
-        [HttpGet]
-        public IActionResult GetAllAccounts()
+        private readonly MoneyTrackerDbContext _context;
+
+        public AccountsController(MoneyTrackerDbContext context)
         {
-            return Ok(new {message = "Get all accounts"});
+            _context = context;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAllAccounts()
+        {
+            var accounts = await _context.Accounts.ToListAsync();
+            return Ok(accounts);
         }
 
         [HttpGet("{id}")]
