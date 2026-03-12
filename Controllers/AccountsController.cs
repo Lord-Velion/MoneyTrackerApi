@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MoneyTrackerApi.DTOs;
 using MoneyTrackerApi.Models;
 using System.Threading.Tasks;
 
@@ -17,35 +18,100 @@ namespace MoneyTrackerApi.Controllers
             _context = context;
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAllAccounts()
+        private async Task<bool> AccountExists(int id)
         {
-            var accounts = await _context.Accounts.ToListAsync();
-            return Ok(accounts);
+            return await _context.Accounts.AnyAsync(e => e.Id == id);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<AccountDTO>>> GetAllAccounts()
+        {
+            var accounts = await _context.Accounts
+                .Select(a => new AccountDTO
+                {
+                    Id = a.Id,
+                    Name = a.Name,
+                    Description = a.Description
+                })
+                .ToListAsync();
+
+            return accounts;
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetAccountById(int id)
+        public async Task<ActionResult<Account>> GetAccountById(int id)
         {
-            return Ok(new { message = "Get account by id" });
+            var account = await _context.Accounts.FindAsync(id);
+
+            if (account == null)
+            {
+                return NotFound();
+            }
+
+            return account;
         }
 
         [HttpPost]
-        public IActionResult CreateAccount()
+        public async Task<ActionResult<Account>> CreateAccount(CreateAccountDTO dto)
         {
-            return Ok(new { message = "Create new account" });
+            var account = new Account
+            {
+                Name = dto.Name,
+                Description = dto.Description
+            };
+
+            _context.Accounts.Add(account);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetAccountById), new { id = account.Id }, account);
         }
 
         [HttpPut("{id}")]
-        public IActionResult UpdateAccount()
-        {
-            return Ok(new { message = "Update account" });
+        public async Task<IActionResult> UpdateAccount(int id, UpdateAccountDTO updateAccountDTO)
+        { 
+
+            var account = await _context.Accounts.FindAsync(id);
+
+            if (account == null)
+            {
+                return NotFound();
+            }
+
+            account.Name = updateAccountDTO.Name;
+            account.Description = updateAccountDTO.Description;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!await AccountExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
         }
 
         [HttpDelete("{id}")]
-        public IActionResult DeleteAccount()
+        public async Task<IActionResult> DeleteAccount(int id)
         {
-            return Ok(new { message = "Delete account" });
+            var account = await _context.Accounts.FindAsync(id);
+            if (account == null)
+            {
+                return NotFound();
+            }
+
+            _context.Accounts.Remove(account);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
 
     }
