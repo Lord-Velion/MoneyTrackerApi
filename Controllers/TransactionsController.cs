@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MoneyTrackerApi.DTOs;
@@ -7,26 +9,44 @@ using System.Threading.Tasks;
 
 namespace MoneyTrackerApi.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class TransactionsController : ControllerBase
     {
         private readonly MoneyTrackerDbContext _context;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public TransactionsController(MoneyTrackerDbContext context)
+        public TransactionsController(MoneyTrackerDbContext context, UserManager<ApplicationUser> userManager)
         {
             _context = context;
+            _userManager = userManager;
         }
 
-        private async Task<bool> TransactionExists(int id)
+        private string GetUserId()
         {
-            return await _context.Transactions.AnyAsync(e => e.Id == id);
+            return _userManager.GetUserId(User);
+        }
+
+        private async Task<bool> TransactionExistsForUser(int id, string userId)
+        {
+            return await _context.Transactions.AnyAsync(e => e.Id == id && e.UserId == userId);
+        }
+
+        private async Task<bool> AccountAndCategoryBelongToUser(int accountId, int categoryId, string userId)
+        {
+            var account = await _context.Accounts.FindAsync(accountId);
+            var category = await _context.Categories.FindAsync(categoryId);
+            return account != null && account.UserId == userId &&
+                   category != null && category.UserId == userId;
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TransactionDTO>>> GetAllTransactions()
         {
+            var userId = GetUserId();
             var transactions = await _context.Transactions
+                .Where(t => t.UserId == userId) // Фильтр по пользователю
                 .Select(t => new TransactionDTO
                 {
                     Id = t.Id,
@@ -45,7 +65,9 @@ namespace MoneyTrackerApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Transaction>> GetTransactionById(int id)
         {
-            var transaction = await _context.Transactions.FindAsync(id);
+            var userId = GetUserId();
+            var transaction = await _context.Transactions
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId); // Проверка принадлежности
 
             if (transaction == null)
             {
@@ -58,6 +80,13 @@ namespace MoneyTrackerApi.Controllers
         [HttpPost]
         public async Task<ActionResult<Transaction>> CreateTransaction(CreateTransactionDTO dto)
         {
+            var userId = GetUserId();
+
+            if (!await AccountAndCategoryBelongToUser(dto.AccountId, dto.CategoryId, userId))
+            {
+                return BadRequest("Account or Category does not belong to the current user.");
+            }
+
             var transaction = new Transaction
             {
                 Amount = dto.Amount,
@@ -65,7 +94,8 @@ namespace MoneyTrackerApi.Controllers
                 Date = dto.Date,
                 IsIncome = dto.IsIncome,
                 AccountId = dto.AccountId,
-                CategoryId = dto.CategoryId
+                CategoryId = dto.CategoryId,
+                UserId = userId
             };
 
             _context.Transactions.Add(transaction);
@@ -77,11 +107,18 @@ namespace MoneyTrackerApi.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateTransaction(int id, UpdateTransactionDTO updateTransactionDTO)
         {
-            var transaction = await _context.Transactions.FindAsync(id);
+            var userId = GetUserId();
+            var transaction = await _context.Transactions
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
 
             if (transaction == null)
             {
                 return NotFound();
+            }
+        
+            if (!await AccountAndCategoryBelongToUser(updateTransactionDTO.AccountId, updateTransactionDTO.CategoryId, userId))
+            {
+                return BadRequest("Account or Category does not belong to the current user.");
             }
 
             transaction.Amount = updateTransactionDTO.Amount;
@@ -97,7 +134,7 @@ namespace MoneyTrackerApi.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!await TransactionExists(id))
+                if (!await TransactionExistsForUser(id, userId))
                 {
                     return NotFound();
                 }
@@ -106,14 +143,17 @@ namespace MoneyTrackerApi.Controllers
                     throw;
                 }
             }
-            
+
             return NoContent();
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteTransaction(int id)
         {
-            var transaction = await _context.Transactions.FindAsync(id);
+            var userId = GetUserId();
+            var transaction = await _context.Transactions
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
+
             if (transaction == null)
             {
                 return NotFound();

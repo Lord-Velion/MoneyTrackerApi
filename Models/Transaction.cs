@@ -22,4 +22,6 @@ public partial class Transaction
     public virtual Account Account { get; set; } = null!;
 
     public virtual Category Category { get; set; } = null!;
+    public string UserId { get; set; }
+    public ApplicationUser User { get; set; }
 }

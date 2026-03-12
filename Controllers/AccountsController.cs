@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MoneyTrackerApi.DTOs;
@@ -7,32 +9,42 @@ using System.Threading.Tasks;
 
 namespace MoneyTrackerApi.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class AccountsController : ControllerBase
     {
         private readonly MoneyTrackerDbContext _context;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public AccountsController(MoneyTrackerDbContext context)
+        public AccountsController(MoneyTrackerDbContext context, UserManager<ApplicationUser> userManager)
         {
             _context = context;
+            _userManager = userManager;
         }
 
-        private async Task<bool> AccountExists(int id)
+        private string GetUserId()
         {
-            return await _context.Accounts.AnyAsync(e => e.Id == id);
+            return _userManager.GetUserId(User);
+        }
+
+        private async Task<bool> AccountExistsForUser(int id, string userId)
+        {
+            return await _context.Accounts.AnyAsync(e => e.Id == id && e.UserId == userId);
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<AccountDTO>>> GetAllAccounts()
         {
+            var userId = GetUserId();
             var accounts = await _context.Accounts
+                .Where(a => a.UserId == userId)
                 .Select(a => new AccountDTO
                 {
                     Id = a.Id,
                     Name = a.Name,
                     Description = a.Description
-                })
+                })     
                 .ToListAsync();
 
             return accounts;
@@ -41,7 +53,9 @@ namespace MoneyTrackerApi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Account>> GetAccountById(int id)
         {
-            var account = await _context.Accounts.FindAsync(id);
+            var userId = GetUserId();
+            var account = await _context.Accounts
+                .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
 
             if (account == null)
             {
@@ -57,7 +71,8 @@ namespace MoneyTrackerApi.Controllers
             var account = new Account
             {
                 Name = dto.Name,
-                Description = dto.Description
+                Description = dto.Description,
+                UserId = GetUserId()
             };
 
             _context.Accounts.Add(account);
@@ -68,9 +83,10 @@ namespace MoneyTrackerApi.Controllers
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateAccount(int id, UpdateAccountDTO updateAccountDTO)
-        { 
-
-            var account = await _context.Accounts.FindAsync(id);
+        {
+            var userId = GetUserId();
+            var account = await _context.Accounts
+                .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
 
             if (account == null)
             {
@@ -86,7 +102,7 @@ namespace MoneyTrackerApi.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!await AccountExists(id))
+                if (!await AccountExistsForUser(id, userId))
                 {
                     return NotFound();
                 }
@@ -102,7 +118,10 @@ namespace MoneyTrackerApi.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAccount(int id)
         {
-            var account = await _context.Accounts.FindAsync(id);
+            var userId = GetUserId();
+            var account = await _context.Accounts
+                .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
+
             if (account == null)
             {
                 return NotFound();
