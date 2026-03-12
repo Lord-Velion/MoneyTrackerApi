@@ -1,5 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MoneyTrackerApi.DTOs;
+using MoneyTrackerApi.Models;
+using System.Threading.Tasks;
 
 namespace MoneyTrackerApi.Controllers
 {
@@ -7,34 +11,106 @@ namespace MoneyTrackerApi.Controllers
     [ApiController]
     public class CategoriesController : ControllerBase
     {
-        [HttpGet]
-        public IActionResult GetAllCategories()
+        private readonly MoneyTrackerDbContext _context;
+
+        public CategoriesController(MoneyTrackerDbContext context)
         {
-            return Ok(new { message = "Get all categories" });
+            _context = context;
+        }
+
+        private async Task<bool> CategoryExists(int id)
+        {
+            return await _context.Categories.AnyAsync(e => e.Id == id);
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<CategoryDTO>>> GetAllCategories()
+        {
+            var categories = await _context.Categories
+                .Select(c => new CategoryDTO
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    Description = c.Description
+                })
+                .ToListAsync();
+
+            return categories;
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetCategoryById(int id)
+        public async Task<ActionResult<Category>> GetCategoryById(int id)
         {
-            return Ok(new { message = "Get category by id" });
+            var category = await _context.Categories.FindAsync(id);
+
+            if (category == null)
+            {
+                return NotFound();
+            }
+
+            return category;
         }
 
         [HttpPost]
-        public IActionResult CreateCategory()
+        public async Task<ActionResult<Category>> CreateCategory(CreateCategoryDTO dto)
         {
-            return Ok(new { message = "Create new category" });
+            var category = new Category
+            {
+                Name = dto.Name,
+                Description = dto.Description
+            };
+
+            _context.Categories.Add(category);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetCategoryById), new { id = category.Id }, category);
         }
 
         [HttpPut("{id}")]
-        public IActionResult UpdateCategory()
+        public async Task<IActionResult> UpdateCategory(int id, UpdateCategoryDTO updateCategoryDTO)
         {
-            return Ok(new { message = "Update category" });
+            var category = await _context.Categories.FindAsync(id);
+
+            if (category == null)
+            {
+                return NotFound();
+            }
+
+            category.Name = updateCategoryDTO.Name;
+            category.Description = updateCategoryDTO.Description;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!await CategoryExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
         }
 
         [HttpDelete("{id}")]
-        public IActionResult DeleteCategory()
+        public async Task<IActionResult> DeleteCategory(int id)
         {
-            return Ok(new { message = "Delete category" });
+            var category = await _context.Categories.FindAsync(id);
+            if (category == null)
+            {
+                return NotFound();
+            }
+
+            _context.Categories.Remove(category);
+            await _context.SaveChangesAsync();
+            
+            return NoContent();
         }
     }
 }
