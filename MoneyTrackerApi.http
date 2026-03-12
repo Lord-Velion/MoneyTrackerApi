@@ -4,3 +4,18 @@ GET {{MoneyTrackerApi_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
+
+### ¬ход в систему
+POST https://localhost:7243/api/auth/login
+Content-Type: application/json
+
+{
+    "email": "test@example.com",
+    "password": "Test123!"
+}
+
+
+### Get all accounts
+
+GET https://localhost:7243/api/accounts
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjMzQxZjNhYy05ZjY3LTRmNzAtYWFjMC02ZmYzMWExMzhkM2MiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJqdGkiOiJhZjNmZjliZi03NzJlLTQ3MTctODEzZS1hMTZmOTA1M2I1NTciLCJleHAiOjE3NzMzMzA5NzcsImlzcyI6InlvdXItaXNzdWVyIiwiYXVkIjoieW91ci1hdWRpZW5jZSJ9.g_k23j3ruFwqQQlej8r8bQ5E6Man5Ev_haSrHz70sz0
